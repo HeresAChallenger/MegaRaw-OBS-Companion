@@ -1,0 +1,39 @@
+name: Publish Windows release
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+      - name: Build Windows ZIP
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          files = [
+              'mega_raw_obs.py', 'INICIAR.bat', 'som_alerta.wav',
+              'README.md', 'README.en.md', 'LICENSE', 'AUDIO-LICENSE.txt'
+          ]
+          output = Path('MegaRaw_OBS_Companion_v1.4.0_Windows.zip')
+          with ZipFile(output, 'w', compression=ZIP_DEFLATED, compresslevel=9) as archive:
+              for filename in files:
+                  if not Path(filename).is_file():
+                      raise SystemExit(f'Missing distribution file: {filename}')
+                  archive.write(filename, arcname=f'MegaRaw-OBS-Companion-v1.4.0/{filename}')
+          print(f'Windows package: {output} ({output.stat().st_size} bytes)')
+          PY
+      - name: Publish GitHub release v1.4.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1.4.0 MegaRaw_OBS_Companion_v1.4.0_Windows.zip --title "MegaRaw OBS Companion v1.4.0" --notes-file RELEASE_NOTES.md --target "${GITHUB_SHA}"
